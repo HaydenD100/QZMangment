@@ -1,11 +1,15 @@
 import tkinter as tk
 from tkinter import messagebox
-import winreg
-import subprocess
-import datetime
 import json
 import threading
 import time
+import sys
+import requests # REQUIRED: pip install requests
+
+# --- IMPORT EXTERNAL MODULES ---
+import agent_logic  # Your software scanner
+import os_check     # Your OS scanner
+# -------------------------------
 
 # ==========================================
 # 1. DESIGN SYSTEM
@@ -33,60 +37,34 @@ FONTS = {
 }
 
 # ==========================================
-# 2. SCANNING LOGIC
+# 2. NETWORK LOGIC (PRODUCTION)
 # ==========================================
-def get_real_os_name():
-    try:
-        command = "(Get-CimInstance Win32_OperatingSystem).Caption"
-        result = subprocess.check_output(["powershell", "-Command", command], text=True).strip()
-        return result.replace("Microsoft ", "")
-    except:
-        return "Unknown"
-
-def get_os_info():
-    key_path = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-    data = {}
-    try:
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
-            data['edition'] = get_real_os_name()
-            data['version'] = winreg.QueryValueEx(key, "DisplayVersion")[0]
-            current_build = winreg.QueryValueEx(key, "CurrentBuild")[0]
-            ubr = winreg.QueryValueEx(key, "UBR")[0]
-            data['build'] = f"{current_build}.{ubr}"
-    except Exception as e:
-        data['error'] = str(e)
-    return data
-
-def get_installed_software():
-    software_list = []
-    registry_paths = [
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-    ]
-    for reg_path in registry_paths:
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
-                for i in range(winreg.QueryInfoKey(key)[0]):
-                    try:
-                        sub_key_name = winreg.EnumKey(key, i)
-                        with winreg.OpenKey(key, sub_key_name) as sub_key:
-                            name = winreg.QueryValueEx(sub_key, "DisplayName")[0]
-                            try:
-                                version = winreg.QueryValueEx(sub_key, "DisplayVersion")[0]
-                            except FileNotFoundError:
-                                version = "Unknown"
-                            software_list.append({"name": name, "version": version})
-                    except (OSError, FileNotFoundError):
-                        continue
-        except Exception:
-            pass
-    return [dict(t) for t in {tuple(d.items()) for d in software_list}]
-
 def send_payload(payload):
-    # Simulating network request
-    print(json.dumps(payload, indent=2))
-    time.sleep(1.5) 
-    return True
+    """
+    Sends the JSON payload to the Flask Database Server.
+    """
+    # Ensure this matches your running Flask server URL
+    url = "http://127.0.0.1:5000/AgentSend"
+    
+    try:
+        print(f" [NET] Sending data to {url}...")
+        
+        # Set timeout to 10 seconds to prevent hanging
+        response = requests.post(url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            print(" [NET] Success: Server accepted payload.")
+            return True
+        else:
+            print(f" [NET] Server Error ({response.status_code}): {response.text}")
+            return False
+            
+    except requests.exceptions.ConnectionError:
+        print(" [NET] Connection Refused. Is the Flask server running?")
+        return False
+    except Exception as e:
+        print(f" [NET] Error: {e}")
+        return False
 
 # ==========================================
 # 3. GUI LOGIC
@@ -107,21 +85,49 @@ def start_scan():
         messagebox.showwarning("Validation", "Please fill in all fields.")
         return
 
+    # UI: Loading State
     btn_scan.config(state=tk.DISABLED, text="SCANNING SYSTEM...", bg=COLORS['stone'])
-    status_label.config(text="Status: Scanning software registry...", bg=COLORS['sage_green'], fg=COLORS['white'])
+    status_label.config(text="Status: Starting System Scan...", bg=COLORS['sage_green'], fg=COLORS['white'])
     
     def scan_thread():
-        os_data = get_os_info()
-        sw_data = get_installed_software()
-        
-        payload = {
-            "auth": {"username": username, "password": password},
-            "os_info": os_data,
-            "software": sw_data
-        }
-        
-        success = send_payload(payload)
-        root.after(0, lambda: finish_scan(success))
+        try:
+            print("\n" + "="*40)
+            print(" 1. GATHERING OS INFO")
+            print("="*40)
+            
+            # 1. Get OS Info
+            os_data = os_check.get_os_data()
+            print(f" [+] OS:    {os_data['edition']}")
+            print(f" [+] Build: {os_data['build']}")
+            
+            print("\n" + "="*40)
+            print(" 2. STARTING SOFTWARE SCAN")
+            print("="*40)
+            status_label.config(text="Status: Scanning installed software...")
+            
+            # 2. Get Software
+            sw_data = agent_logic.scan_all_software()
+            print(f"\n [OK] Scan Complete. Found {len(sw_data)} items.")
+            
+            status_label.config(text="Status: Uploading to Database...")
+            
+            # 3. Build Payload
+            payload = {
+                "auth": {
+                    "username": username, 
+                    "password": password
+                },
+                "os_info": os_data,        # Includes Edition, Version, Build, InstallDate
+                "installed_software": sw_data
+            }
+            
+            # 4. Send Network Request
+            success = send_payload(payload)
+            root.after(0, lambda: finish_scan(success))
+            
+        except Exception as e:
+            print(f"Critical Error: {e}")
+            root.after(0, lambda: finish_scan(False))
 
     threading.Thread(target=scan_thread, daemon=True).start()
 
@@ -130,9 +136,10 @@ def finish_scan(success):
     
     if success:
         status_label.config(text="Status: Upload Complete ✔", bg=COLORS['mint_accent'], fg=COLORS['deep_emerald'])
-        messagebox.showinfo("Success", "System audit completed successfully.")
+        messagebox.showinfo("Success", "Scan complete and data uploaded to database successfully.")
     else:
-        status_label.config(text="Status: Connection Failed ✖", bg=COLORS['critical'], fg=COLORS['white'])
+        status_label.config(text="Status: Upload Failed (Check Console) ✖", bg=COLORS['critical'], fg=COLORS['white'])
+        messagebox.showerror("Connection Error", "Could not send data to server.\nCheck if the server is running and credentials are correct.")
 
 # ==========================================
 # 4. UI CONSTRUCTION
@@ -198,7 +205,11 @@ status_label = tk.Label(root, text="Ready to scan",
                         bg=COLORS['charcoal'], 
                         fg=COLORS['white'], 
                         anchor="center")
-# --- CHANGED: ipady increased to 10 ---
 status_label.pack(side="bottom", fill="x", ipady=10)
 
-root.mainloop()
+if __name__ == "__main__":
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("\nAgent stopped by user.")
+        sys.exit(0)
