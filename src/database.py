@@ -81,8 +81,8 @@ def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recomm
     user_id = row[0]
     cur.execute("""
         INSERT INTO "Software" (Name,Version, CVSS, Summary, Recommendation, LastScan, UserID)
-        VALUES (%s,%s, %s, %s, %s, %s, %s)
-        RETURNING ID;
+        VALUES (%s,%s, %s, %s, %s, %s, %s) ON CONFLICT (Name, UserID) DO NOTHING
+    RETURNING ID;
     """, (SoftwareName,Version, CVSS, Summary, Recommendation, LastScan, user_id))
     software_id = cur.fetchone()[0]
     conn.commit()
