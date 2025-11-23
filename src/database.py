@@ -17,7 +17,7 @@ def InitDataBase():
     cur.execute("""
     CREATE TABLE IF NOT EXISTS "UserMonitor" (
         ID SERIAL PRIMARY KEY,
-        Name VARCHAR(150) NOT NULL,
+        Name VARCHAR(150) NOT NULL UNIQUE,
         HashedPassword VARCHAR(255) NOT NULL
     );
     """)
@@ -164,4 +164,5 @@ def serialize_user(user):
         "Name": user.Name,
         "HashedPassword": user.HashedPassword
     }
+
 InitDataBase()
