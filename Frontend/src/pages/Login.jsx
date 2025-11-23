@@ -35,7 +35,10 @@ export default function Login() {
     setError(data.error || "Login failed");
   } else {
     console.log("Login successful:", data);
-    localStorage.setItem("role", "admin");
+    if(data.Name == "admin@qz.com")
+      localStorage.setItem("role", "admin");
+    else
+      localStorage.setItem("role", "user");
     localStorage.setItem("username", data.Name);
     localStorage.setItem("password", data.HashedPassword);
 

@@ -59,21 +59,34 @@ def logout():
 
 
 #Erics shit 
-@app.route('/AgentSend')
+@app.route('/AgentSend', methods=['POST'])
 def AgentSend():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
+    
     data = request.get_json()
 
-    username = data.get('username')
-    password = data.get('password')
+    # Parse authentication info from nested JSON
+    auth = data.get("auth", {})
+    username = auth.get("username")
+    password = auth.get("password")
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
+
+    # Authenticate user
     un = GetUser(username)
     if un.HashedPassword != password:
         return jsonify({"error": "Incorrect username or password"}), 400
-    for software in data.get('Softwares'):
-        AddSoftware(username,software['Name'],software['Version'])
+
+    # Parse installed software list
+    softwares = data.get("installed_software", [])
+    for software in softwares:
+        name = software.get("name")
+        version = software.get("version")
+        if name and version:
+            AddSoftware(username, name, version)
+
+    return jsonify({"status": "success"}), 200
 
 @app.route('/GetUser', methods=['GET', 'POST'])
 def get_user_info():
@@ -101,16 +114,56 @@ def get_user_info():
     return  serialize_user(GetUser(username))
     
 #getting software belonging to user GetSoftwareByUser()
-@app.route('/GetAllSoftware', methods=['GET'])
+@app.route('/GetUserSoftware', methods=['POST'])
+def GetUserSoftware():
+    data = request.get_json() or {}
+    username = data.get("username")
+    password = data.get("password")
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    un = GetUser(username)
+    if not un:
+        return jsonify({"error": "User not found"}), 404
+    if un.HashedPassword != password:
+        return jsonify({"error": "Incorrect username or password"}), 400
+    if(username == "admin@qz.com"):
+        software_list = GetAllSoftware()
+    else:
+        software_list = GetSoftwareByUser(username)
+        
+    json_list = [serialize_software(sw) for sw in software_list]
+    return jsonify(json_list) 
+
+@app.route('/GetSoftwareByName', methods=['GET'])
+def GetSoftware():
+    data = request.get_json() or {}
+    username = data.get("username")
+    password = data.get("password")
+    softwareName = data.get("oftwareName")
+
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    un = GetUser(username)
+    if not un:
+        return jsonify({"error": "User not found"}), 404
+    if un.HashedPassword != password:
+        return jsonify({"error": "Incorrect username or password"}), 400
+    
+    sftwbu = GetSoftwareByUser(username,softwareName)
+    return jsonify(sftwbu)
+
+@app.route('/GetSoftware', methods=['GET'])
 def GetSoftware():
     username = request.args.get("username")
+    software = request.args.get("software")
+
     password = request.args.get("password")
     data = request.get_json()
-    sftwbu = GetSoftwareByUser(username)
+    sftwbu = GetSoftwareByUser(username,software)
     return jsonify(sftwbu)
     
 @app.route('/AddSoftware', methods=['GET'])
-def AddSoftware():
+def AddSoftwareDB():
     data = request.get_json()
     username = data.get('UserName')
     name = data.get('Name')

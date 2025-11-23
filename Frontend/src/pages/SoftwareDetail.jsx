@@ -3,116 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import "../App.css";
 
-// Mock data
-const mockSoftwareData = {
-  "Node.js": {
-    Name: "Node.js",
-    Version: "18.17.0",
-    Status: "Update Available",
-    RiskLevel: "Critical",
-    Recommendation: "Update to version 20.x immediately",
-    users: [
-      { userId: "john.doe", version: "14.15.0", status: "Outdated", riskLevel: "Critical" },
-      { userId: "jane.smith", version: "18.17.0", status: "Supported", riskLevel: "OK" },
-      { userId: "mike.johnson", version: "16.20.0", status: "Update Available", riskLevel: "High" },
-      { userId: "sarah.wilson", version: "12.18.0", status: "Outdated", riskLevel: "Critical" },
-      { userId: "alex.brown", version: "14.15.0", status: "Outdated", riskLevel: "Critical" }
-    ]
-  },
-  "Chrome": {
-    Name: "Chrome",
-    Version: "119.0",
-    Status: "Supported",
-    RiskLevel: "Informational",
-    Recommendation: "Latest version installed",
-    users: [
-      { userId: "john.doe", 
-        version: "119.0", 
-        status: "Supported", 
-        riskLevel: "OK" },
-
-      { userId: "jane.smith", 
-        version: "118.0", 
-        status: "Update Available", 
-        riskLevel: "Informational" },
-
-      { userId: "mike.johnson", 
-        version: "115.0", 
-        status: "Outdated", 
-        riskLevel: "Medium" }
-    ]
-  },
-  "VS Code": {
-    Name: "VS Code",
-    Version: "1.84.0",
-    Status: "Supported",
-    RiskLevel: "OK",
-    Recommendation: "Up to date",
-    users: [
-      { userId: "john.doe", 
-        version: "1.84.0", 
-        status: "Supported", 
-        riskLevel: "OK" },
-
-      { userId: "jane.smith", 
-        version: "1.84.0", 
-        status: "Supported", 
-        riskLevel: "OK" },
-
-      { userId: "mike.johnson", 
-        version: "1.84.0", 
-        status: "Supported", 
-        riskLevel: "OK" }
-    ]
-  },
-  "Adobe Reader": {
-    Name: "Adobe Reader",
-    Version: "2023.006.20320",
-    Status: "Outdated",
-    RiskLevel: "High",
-    Recommendation: "Security update required",
-    users: [
-      { userId: "john.doe", 
-        version: "2022.001.20085", 
-        status: "Outdated", 
-        riskLevel: "High" },
-
-      { userId: "jane.smith", 
-        version: "2023.006.20320", 
-        status: "Supported", 
-        riskLevel: "OK" },
-
-      { userId: "mike.johnson", 
-        version: "2020.001.20085", 
-        status: "Outdated", 
-        riskLevel: "Critical" }
-    ]
-  },
-  "Python": {
-    Name: "Python",
-    Version: "3.11.0",
-    Status: "Update Available",
-    RiskLevel: "Medium",
-    Recommendation: "Consider updating to 3.12.0",
-    users: [
-      { userId: "john.doe", 
-        version: "3.9.0", 
-        status: "Outdated", 
-        riskLevel: "Medium" },
-
-      { userId: "jane.smith", 
-        version: "3.11.0", 
-        status: "Supported", 
-        riskLevel: "OK" },
-
-      { userId: "mike.johnson", 
-        version: "3.8.0", 
-        status: "Outdated", 
-        riskLevel: "High" }
-    ]
-  }
-};
-
 // Risk level sorting order
 const riskLevelOrder = {
   "Critical": 1,
@@ -126,8 +16,40 @@ const riskLevelOrder = {
 export default function SoftwareDetail() {
   const { softwareName } = useParams();
   const navigate = useNavigate();
-  
-  const software = mockSoftwareData[softwareName];
+  console.log(softwareName)
+
+      useEffect(() => {
+  const fetchSoftware = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:5000/GetSoftwareByName", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          username: localStorage.getItem("username"),
+          password: localStorage.getItem("password"),
+          softwareName: softwareName
+        })
+      });
+
+      const data = await response.json();
+      console.log(data);
+
+      const sortedSoftware = [...data].sort(
+          (a, b) => riskLevelOrder[a.RiskLevel] - riskLevelOrder[b.RiskLevel]
+        );
+
+        setSoftware(sortedSoftware);
+        console.log(sortedSoftware)
+
+    } catch (error) {
+      console.error("Error fetching software:", error);
+    }
+  };
+
+  fetchSoftware();
+}, []); // empty dependency array
 
   if (!software) {
     return (

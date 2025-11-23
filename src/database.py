@@ -26,20 +26,23 @@ def InitDataBase():
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS "Software" (
-        ID SERIAL PRIMARY KEY,
-        Version INT,
-        Name VARCHAR(150) NOT NULL,
-        CVSS NUMERIC(4,2),
-        Summary TEXT,
-        Recommendation TEXT,
-        LastScan TIMESTAMP,
-        UserID INT,
-        FOREIGN KEY (UserID) REFERENCES "UserMonitor"(ID) ON DELETE SET NULL
+    ID SERIAL PRIMARY KEY,
+    Version VARCHAR(255),
+    Name VARCHAR(150) NOT NULL,
+    CVSS NUMERIC(4,2),
+    Summary TEXT,
+    Recommendation TEXT,
+    LastScan TIMESTAMP,
+    UserID INT,
+    FOREIGN KEY (UserID) REFERENCES "UserMonitor"(ID) ON DELETE SET NULL,
+    CONSTRAINT unique_user_software UNIQUE (Name, UserID)
     );
     """)
-    
+
     cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test", "test1"))
     cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test@qz.com", "test1"))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("admin@qz.com", "admin123"))
+    cur.execute('INSERT INTO "Software" (Version, Name, CVSS, Summary, Recommendation, LastScan, UserID) VALUES (%s, %s, %s, %s, %s, %s, %s)', (1, "Example Software", 7.5, "This is a summary of the software vulnerability.", "Update to the latest version.", "2025-11-23 10:00:00", 1))
 
     conn.commit()
 
@@ -89,8 +92,22 @@ def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recomm
 
 def GetAllSoftware():
     cur.execute('SELECT * FROM "Software";')
-    software = cur.fetchone()
-    return software
+    rows = cur.fetchall()
+    software_list = []
+    for r in rows:
+        sw = Software()
+        print(r)
+        sw.ID = r[0]
+        sw.Name = r[2]       # Should be 'version' here
+        sw.Version = r[1]    # Should be 'name' here
+        sw.CVSS = r[3]
+        sw.Summary = r[4]
+        sw.Recommendation = r[5]
+        sw.LastScan = r[6]
+        sw.UserID = r[7]
+        software_list.append(sw)
+
+    return software_list
 
 def GetSoftwareByUser(UserName):
     global cur
@@ -113,8 +130,8 @@ def GetSoftwareByUser(UserName):
     for r in rows:
         sw = Software()
         sw.ID = r[0]
-        sw.Name = r[1]
-        sw.Version = r[2]
+        sw.Name = r[1]       # Should be 'version' here
+        sw.Version = r[2]    # Should be 'name' here
         sw.CVSS = r[3]
         sw.Summary = r[4]
         sw.Recommendation = r[5]
@@ -123,6 +140,36 @@ def GetSoftwareByUser(UserName):
         software_list.append(sw)
 
     return software_list
+
+def GetSoftwareByUser(UserName, SoftwareName):
+    global cur
+    cur.execute('SELECT ID FROM "UserMonitor" WHERE Name = %s;', (UserName,))
+    row = cur.fetchone()
+    if not row:
+        print(f"User '{UserName}' not found.")
+        return []
+
+    user_id = row[0]
+
+    cur.execute("""
+        SELECT *
+        FROM "Software"
+        WHERE UserID = %s AND Name = %s;
+    """, (user_id,SoftwareName))
+
+    r = cur.fetchall()
+    r = r[0]
+    sw = Software()
+    sw.ID = r[0]
+    sw.Name = r[1]       # Should be 'version' here
+    sw.Version = r[2]    # Should be 'name' here
+    sw.CVSS = r[3]
+    sw.Summary = r[4]
+    sw.Recommendation = r[5]
+    sw.LastScan = r[6]
+    sw.UserID = r[7]       
+
+    return sw
 
 def UpdateSoftwareByID(SoftwareID, Name=None, Version=None, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
     global conn, cur
@@ -173,6 +220,18 @@ def serialize_user(user):
         "ID": user.ID,
         "Name": user.Name,
         "HashedPassword": user.HashedPassword
+    }
+
+def serialize_software(s):
+    return {
+        "ID": s.ID,
+        "Name": s.Name,
+        "CVSS": s.CVSS,
+        "Summary": s.Summary,
+        "Recommendation": s.Recommendation,
+        "LastScan": s.LastScan,
+        "UserID": s.UserID,
+        "Version": s.Version
     }
 
 InitDataBase()
