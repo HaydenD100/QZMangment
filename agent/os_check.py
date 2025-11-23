@@ -4,24 +4,18 @@ import subprocess
 
 def get_registry_value(key, subkey, value_name):
     try:
-        registry_key = winreg.OpenKey(key, subkey)
-        value, _ = winreg.QueryValueEx(registry_key, value_name)
-        winreg.CloseKey(registry_key)
-        return value
-    except Exception as e:
+        with winreg.OpenKey(key, subkey) as registry_key:
+            value, _ = winreg.QueryValueEx(registry_key, value_name)
+            return value
+    except Exception:
         return "Not Found"
 
 def get_real_os_name():
-    # The Registry 'ProductName' often lies and says 'Windows 10' for compatibility.
-    # We use PowerShell to ask WMI (Windows Management Instrumentation) for the true caption.
     try:
         command = "(Get-CimInstance Win32_OperatingSystem).Caption"
-        # This typically returns "Microsoft Windows 11 Home"
         result = subprocess.check_output(["powershell", "-Command", command], text=True).strip()
-        # Optional: Remove "Microsoft " from the start to match your format exactly
         return result.replace("Microsoft ", "")
     except:
-        # Fallback if PowerShell fails, though unlikely on Windows 11
         return "Unknown"
 
 def get_experience_pack():
@@ -34,38 +28,42 @@ def get_experience_pack():
         pass
     return "Not Found"
 
-def get_windows_info():
+# --- NEW FUNCTION FOR THE AGENT UI ---
+def get_os_data():
+    """
+    Returns OS information as a dictionary for the payload.
+    """
     key_path = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
     
-    # 1. Edition (Fixed method)
-    edition = get_real_os_name()
+    data = {}
     
-    # 2. Version (DisplayVersion)
-    version = get_registry_value(winreg.HKEY_LOCAL_MACHINE, key_path, "DisplayVersion")
+    # 1. Edition
+    data['edition'] = get_real_os_name()
     
-    # 3. Installed On
+    # 2. Version
+    data['version'] = get_registry_value(winreg.HKEY_LOCAL_MACHINE, key_path, "DisplayVersion")
+    
+    # 3. Install Date
     install_timestamp = get_registry_value(winreg.HKEY_LOCAL_MACHINE, key_path, "InstallDate")
     try:
-        install_date = datetime.datetime.fromtimestamp(install_timestamp).strftime('%m/%d/%Y')
+        if isinstance(install_timestamp, int):
+            data['install_date'] = datetime.datetime.fromtimestamp(install_timestamp).strftime('%m/%d/%Y')
+        else:
+            data['install_date'] = "Unknown"
     except:
-        install_date = "Unknown"
+        data['install_date'] = "Unknown"
 
-    # 4. OS Build
+    # 4. Build
     current_build = get_registry_value(winreg.HKEY_LOCAL_MACHINE, key_path, "CurrentBuild")
     ubr = get_registry_value(winreg.HKEY_LOCAL_MACHINE, key_path, "UBR")
-    full_build = f"{current_build}.{ubr}"
+    data['build'] = f"{current_build}.{ubr}"
 
     # 5. Experience
-    experience = get_experience_pack()
-
-    # --- Output ---
-    print(f"{'Edition':<15} {edition}")
-    print(f"{'Version':<15} {version}")
-    print(f"{'Installed on':<15} {install_date}")
-    print(f"{'OS build':<15} {full_build}")
-    print(f"{'Experience':<15} {experience}")
+    data['experience'] = get_experience_pack()
+    
+    return data
 
 if __name__ == "__main__":
-    print("Fetching Corrected System Information...\n")
-    get_windows_info()
+    # Test run
+    print(get_os_data())
     input("\nPress Enter to exit...")
