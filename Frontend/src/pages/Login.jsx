@@ -36,7 +36,10 @@ export default function Login() {
   } else {
     console.log("Login successful:", data);
     localStorage.setItem("role", "admin");
-    localStorage.setItem("username", "Admin User");
+    localStorage.setItem("username", data.Name);
+    localStorage.setItem("password", data.HashedPassword);
+
+    console.log(data.Name)
     navigate("/admin"); // now it will navigate
   }
 } catch (err) {
