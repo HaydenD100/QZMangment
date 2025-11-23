@@ -3,7 +3,7 @@ class Software:
         self.ID = None
         self.Name = None
         self.Version = None
-        self.CVSS = None
+        self.CVE = None
         self.Summary = None
         self.Recommnedation = None
         self.LastScan = None #Time Stamp

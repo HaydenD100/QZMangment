@@ -1,4 +1,6 @@
 from common import *
+from enrichment import *
+
 from database import *
 import requests
 import os
@@ -7,6 +9,7 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
 app.secret_key = "y098765rtyfghjUIASDTYGHJAUISO*IUIY^&%RTFAGD"
 @app.route('/')
 def default_route():
@@ -134,23 +137,36 @@ def GetUserSoftware():
     json_list = [serialize_software(sw) for sw in software_list]
     return jsonify(json_list) 
 
-@app.route('/GetSoftwareByName', methods=['GET'])
+@app.route('/GetSoftwareByName', methods=['POST'])
 def GetSoftwareByName():
-    data = request.get_json() or {}
-    username = data.get("username")
-    password = data.get("password")
-    softwareName = data.get("oftwareName")
+    try:
+        data = request.get_json()
+        print("Received:", data)
 
-    if not username or not password:
-        return jsonify({"error": "Missing username or password"}), 400
-    un = GetUser(username)
-    if not un:
-        return jsonify({"error": "User not found"}), 404
-    if un.HashedPassword != password:
-        return jsonify({"error": "Incorrect username or password"}), 400
-    
-    sftwbu = GetSoftwareByUser(username,softwareName)
-    return jsonify(sftwbu)
+        if not data:
+            return jsonify({"error": "JSON body required"}), 400
+
+        # Match what your frontend sends
+        name = data.get("softwareName")
+        print(name)
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return jsonify({"error": "Missing username or password"}), 400
+
+        # Get the Software object
+        print("ID" + str(name))
+        software = GetSoftwareByID(name)
+        if not software:
+            return jsonify({"error": "Software not found"}), 404
+        # Return JSON properly
+        return jsonify(serialize_software(software))
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/GetSoftware', methods=['GET'])
 def GetSoftware():
@@ -172,5 +188,6 @@ def AddSoftwareDB():
 
 if __name__ == "__main__":
     InitDataBase()
+    #EnrichData()
     app.run(debug=True)
     

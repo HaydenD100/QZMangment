@@ -147,8 +147,7 @@ export default function AdminDashboard() {
                   <th>Software</th>
                   <th>Version</th>
                   <th>Status</th>
-                  <th>Risk Level</th>
-                  <th>Recommendation</th>
+                  <th>LastScan</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,14 +156,14 @@ export default function AdminDashboard() {
                     <td>
                       <button 
                         className="software-link"
-                        onClick={() => handleSoftwareClick(item.Name)}
+                        onClick={() => handleSoftwareClick(item.ID)}
                       >
                         {item.Name}
                       </button>
                     </td>
                     <td>{item.Version}</td>
                     <td><span className={getStatusClass(item.Status)}>{item.Status}</span></td>
-                    <td><span className={getRiskBadgeClass(item.RiskLevel)}>{item.RiskLevel}</span></td>
+                    <td>{item.LastScan}</td>
                     <td>{item.Recommendation}</td>
                   </tr>
                 ))}
