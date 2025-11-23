@@ -100,3 +100,12 @@ def GetSoftware():
     data = request.get_json()
     sftwbu = GetSoftwareByUser(username)
     return jsonify(sftwbu)
+    
+@app.route('/AddSoftware', methods=['GET'])
+def GetUserInfo():
+    data = request.get_json()
+    username = data.get('UserName')
+    name = data.get('Name')
+    version = data.get('Version')
+    AddSoftware(username,name,version)
+
