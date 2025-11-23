@@ -5,21 +5,13 @@ import google.generativeai as genai
 from common import *
 
 # --- CONFIGURATION ---
-<<<<<<< HEAD
 GEMINI_API_KEY = 'AIzaSyCGneEgup3QMbbXe6vaN8EFfvshBQDaPkQ' # <--- PASTE YOUR KEY HERE
-=======
-GEMINI_API_KEY = 'YOUR_GEMINI_KEY_HERE' # <--- PASTE YOUR KEY HERE
->>>>>>> 790b354eccc883528ae291808e703a7047a74624
 BATCH_SIZE = 40
 
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 # We use the specific -001 version to avoid the 404 error
-<<<<<<< HEAD
 model = genai.GenerativeModel('gemini-2.5-flash')
-=======
-model = genai.GenerativeModel('gemini-1.5-flash-001')
->>>>>>> 790b354eccc883528ae291808e703a7047a74624
 
 conn = None
 cur = None
@@ -59,11 +51,7 @@ def InitDataBase():
             ID SERIAL PRIMARY KEY,
             Version VARCHAR(255),
             Name VARCHAR(150) NOT NULL,
-<<<<<<< HEAD
-            CVSS VARCHAR(255),
-=======
             CVSS NUMERIC(4,2),
->>>>>>> 790b354eccc883528ae291808e703a7047a74624
             Summary TEXT,
             Recommendation TEXT,
             LastScan TIMESTAMP,
@@ -328,22 +316,17 @@ def CleanSoftwareNames():
                     new_name = cleaning_map[old_name]
                     # Only update if the name actually changed
                     if new_name != old_name:
-<<<<<<< HEAD
-                        cur.execute('''
-                            UPDATE "Software"
-                            SET Name = %s
-                            WHERE ID = %s
-                            AND NOT EXISTS (
-                                SELECT 1 FROM "Software" s2
-                                WHERE s2.Name = %s AND s2.UserID = "Software".UserID
-                            )
-                            RETURNING ID;
-                        ''', (new_name, sw_id, new_name))
-
-=======
                         # Update using direct SQL
-                        cur.execute('UPDATE "Software" SET Name = %s WHERE ID = %s', (new_name, sw_id))
->>>>>>> 790b354eccc883528ae291808e703a7047a74624
+                        cur.execute('''
+                        UPDATE "Software"
+                        SET Name = %s
+                        WHERE ID = %s
+                        AND NOT EXISTS (
+                            SELECT 1 FROM "Software" s2
+                            WHERE s2.Name = %s AND s2.UserID = "Software".UserID
+                        )
+                        RETURNING ID;
+                    ''', (new_name, sw_id, new_name))
                         print(f"    [FIX] {old_name} -> {new_name}")
             
             conn.commit() # Commit after every batch
@@ -351,7 +334,7 @@ def CleanSoftwareNames():
 
         except Exception as e:
             print(f"[!] Batch Error: {e}")
-            conn.rollback()
+            #conn.rollback()
 
     print("[*] Cleaning Complete.")
 
@@ -367,17 +350,9 @@ def serialize_software(s):
     }
 
 # Initialize connection on import
-<<<<<<< HEAD
-
-# --- HOW TO RUN CLEANING ---
-# To clean your data, uncomment the line below and run this file ONCE:
-InitDataBase()
-//CleanSoftwareNames()
-=======
 InitDataBase()
 
 # --- HOW TO RUN CLEANING ---
 # To clean your data, uncomment the line below and run this file ONCE:
 # if __name__ == "__main__":
 #     CleanSoftwareNames()
->>>>>>> 790b354eccc883528ae291808e703a7047a74624

@@ -163,8 +163,7 @@ export default function AdminDashboard() {
                     </td>
                     <td>{item.Version}</td>
                     <td><span className={getStatusClass(item.Status)}>{item.Status}</span></td>
-                    <td>{item.LastScan}</td>
-                    <td>{item.Recommendation}</td>
+                    <td>{item.LastScan }</td>
                   </tr>
                 ))}
               </tbody>

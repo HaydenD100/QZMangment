@@ -99,9 +99,24 @@ export default function SoftwareDetail() {
         {/* Software Overview */}
         <div className="software-overview">
           <div className="overview-card">
-            <h3>Recommendation</h3>
-            <p>{software.Recommendation || "No recommendations available."}</p>
-          </div>
+  <h3>Risk Analysis</h3>
+  {software.Summary ? (
+    <ul className="vuln-list">
+      {software.Summary.split("...").map((item, index) => {
+        const match = item.match(/\[CVE-(\d{4}-\d+)\s*\|\s*Score:\s*([\d.]+)\]/);
+        const description = item.replace(/\[CVE-\d{4}-\d+\s*\|\s*Score:\s*[\d.]+\]/, '').trim();
+        return match ? (
+          <li key={index}>
+            <strong>{match[0]}</strong>: {description || "No description available."}
+          </li>
+        ) : null;
+      })}
+    </ul>
+  ) : (
+    <p>No recommendations available.</p>
+  )}
+</div>
+
         </div>
       </div>
     </div>
