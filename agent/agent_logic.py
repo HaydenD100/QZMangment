@@ -13,11 +13,8 @@ def get_store_apps_current_user():
     Scans only the current logged-in user's apps (PowerShell).
     """
     ps_command = r"""
-    # Force array @() to prevent null errors
     $apps = @(Get-AppxPackage)
-    
     $output = @()
-    
     foreach ($app in $apps) {
         $output += [PSCustomObject]@{
             Name = $app.Name
@@ -27,20 +24,15 @@ def get_store_apps_current_user():
             IsStore = $true
         }
     }
-    
     $output | ConvertTo-Json -Depth 2
     """
-    
     try:
-        # print("--- Scanning Store Apps (PowerShell) ---") # Commented out for cleaner output
         result = subprocess.run(
             ["powershell", "-Command", ps_command], 
             capture_output=True, text=True, check=True, encoding='utf-8'
         )
-        
         if not result.stdout.strip():
             return []
-            
         return json.loads(result.stdout)
     except Exception as e:
         return []
@@ -55,8 +47,6 @@ def get_registry_apps_native():
         (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
         (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall")
     ]
-
-    # print("--- Scanning Registry (Classic Apps) ---") # Commented out for cleaner output
 
     for root, path in registry_paths:
         try:
@@ -84,23 +74,15 @@ def get_registry_apps_native():
     return apps
 
 def get_exe_from_manifest(folder_path):
-    """
-    Reads AppxManifest.xml to find the actual executable defined by the developer.
-    """
     manifest_path = os.path.join(folder_path, "AppxManifest.xml")
-    
     if not os.path.exists(manifest_path):
         return None
-
     try:
         tree = ET.parse(manifest_path)
         root = tree.getroot()
-        
-        # Strip namespaces
         for elem in root.iter():
             if '}' in elem.tag:
                 elem.tag = elem.tag.split('}', 1)[1] 
-
         applications = root.find('Applications')
         if applications is not None:
             for app in applications.findall('Application'):
@@ -109,20 +91,12 @@ def get_exe_from_manifest(folder_path):
                     return executable
     except Exception:
         pass
-        
     return None
 
 def get_real_version_from_folder(folder_path):
-    """
-    Finds the executable via Manifest or Size, then reads the version header.
-    """
     if not folder_path or not os.path.exists(folder_path):
         return None
-
-    # 1. Try Manifest
     exe_name = get_exe_from_manifest(folder_path)
-    
-    # 2. Fallback: Largest EXE
     if not exe_name:
         exe_files = []
         for root, dirs, files in os.walk(folder_path):
@@ -130,20 +104,14 @@ def get_real_version_from_folder(folder_path):
                 if f.lower().endswith(".exe"):
                     full_p = os.path.join(root, f)
                     exe_files.append((full_p, os.path.getsize(full_p)))
-        
         if exe_files:
             exe_files.sort(key=lambda x: x[1], reverse=True)
             exe_name = os.path.basename(exe_files[0][0])
-
     if not exe_name:
         return None
-
     full_path = os.path.join(folder_path, exe_name)
-    
-    # Handle relative paths
     if not os.path.exists(full_path):
          full_path = os.path.join(folder_path, exe_name)
-
     if os.path.exists(full_path):
         cmd = f"(Get-Item '{full_path}' -ErrorAction SilentlyContinue).VersionInfo.ProductVersion"
         try:
@@ -151,11 +119,12 @@ def get_real_version_from_folder(folder_path):
             return res.stdout.strip()
         except:
             return None
-            
     return None
 
-# --- MAIN ---
-if __name__ == "__main__":
+# ==========================================
+# THIS IS THE NEW FUNCTION THE UI WILL CALL
+# ==========================================
+def scan_all_software():
     final_list = {}
 
     # 1. Registry Scan
@@ -164,11 +133,10 @@ if __name__ == "__main__":
 
     # 2. Store Scan
     store_apps_raw = get_store_apps_current_user()
-    
     if store_apps_raw is None: store_apps_raw = []
     if isinstance(store_apps_raw, dict): store_apps_raw = [store_apps_raw]
 
-    # 3. Process Store Apps with XML Logic
+    # 3. Process Store Apps
     for app in store_apps_raw:
         raw_name = app.get('Name', '')
         install_location = app.get('InstallLocation')
@@ -176,7 +144,6 @@ if __name__ == "__main__":
         
         display_name = raw_name
 
-        # If version is missing/generic, use the XML+File reader
         if (not version or version == "0.0.0.0") and install_location:
              real_ver = get_real_version_from_folder(install_location)
              if real_ver:
@@ -187,17 +154,15 @@ if __name__ == "__main__":
             "Version": version
         }
 
-    # 4. Output
-    print(f"\n{'Name':<60} | {'Version':<15}")
-    print("-" * 80)
-    
-    sorted_keys = sorted(final_list.keys(), key=lambda s: s.lower())
-    
-    count = 0
-    for key in sorted_keys:
-        item = final_list[key]
-        print(f"{item['Name']:<60} | {str(item['Version']):<15}")
-        count += 1
-            
-    print("-" * 80)
-    print(f"Total Items Found: {count}")
+    # 4. Convert to List for JSON Payload
+    output_list = []
+    for key, val in final_list.items():
+        output_list.append({"name": val['Name'], "version": val['Version']})
+        
+    return output_list
+
+if __name__ == "__main__":
+    # Test run if executed directly
+    results = scan_all_software()
+    for item in results:
+        print(f"{item['name']} | {item['version']}")
