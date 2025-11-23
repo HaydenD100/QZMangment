@@ -15,7 +15,7 @@ def InitDataBase():
     )
     cur = conn.cursor()
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS "User" (
+    CREATE TABLE IF NOT EXISTS "UserMonitor" (
         ID SERIAL PRIMARY KEY,
         Name VARCHAR(150) NOT NULL,
         HashedPassword VARCHAR(255) NOT NULL
@@ -32,22 +32,23 @@ def InitDataBase():
         Recommendation TEXT,
         LastScan TIMESTAMP,
         UserID INT,
-        FOREIGN KEY (UserID) REFERENCES "User"(ID) ON DELETE SET NULL
+        FOREIGN KEY (UserID) REFERENCES "UserMonitor"(ID) ON DELETE SET NULL
     );
     """)
     
-    cur.execute("INSERT INTO \"User\" (Name, HashedPassword) VALUES (%s, %s);", ("test", "test1"))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", ("test", "test1"))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", ("test@qz.com", "test1"))
 
     conn.commit()
 
 def AddUser(name, hashedpassword):
     global conn, cur
-    cur.execute("INSERT INTO \"User\" (Name, HashedPassword) VALUES (%s, %s);", (name, hashedpassword))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", (name, hashedpassword))
     conn.commit()
 
 def GetUser(name):
     global conn, cur
-    cur.execute('SELECT ID, Name, HashedPassword FROM "User" WHERE Name = %s;', (name,))
+    cur.execute('SELECT ID, Name, HashedPassword FROM "UserMonitor" WHERE Name = %s;', (name,))
     user_row = cur.fetchone() 
     if user_row:
         userClass = User() 
@@ -60,7 +61,7 @@ def GetUser(name):
 
 def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
     global conn, cur
-    cur.execute('SELECT ID FROM "User" WHERE Name = %s;', (UserName,))
+    cur.execute('SELECT ID FROM "UserMonitor" WHERE Name = %s;', (UserName,))
     row = cur.fetchone()
     if not row:
         print(f"User '{UserName}' not found.")
@@ -73,7 +74,7 @@ def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recomm
     """, (SoftwareName,Version, CVSS, Summary, Recommendation, LastScan, user_id))
     software_id = cur.fetchone()[0]
     conn.commit()
-    print(f"Inserted Software '{SoftwareName}' with ID {software_id} for User '{UserName}'")
+    print(f"Inserted Software '{SoftwareName}' with ID {software_id} for UserMonitor '{UserName}'")
     return software_id
 
 def GetAllSoftware():
@@ -81,10 +82,9 @@ def GetAllSoftware():
     software = cur.fetchone()
     return software
 
-
 def GetSoftwareByUser(UserName):
     global cur
-    cur.execute('SELECT ID FROM "User" WHERE Name = %s;', (UserName,))
+    cur.execute('SELECT ID FROM "UserMonitor" WHERE Name = %s;', (UserName,))
     row = cur.fetchone()
     if not row:
         print(f"User '{UserName}' not found.")
@@ -155,6 +155,5 @@ def UpdateSoftwareByID(SoftwareID, Name=None, Version=None, CVSS=None, Summary=N
 
     print(f"Software with ID {SoftwareID} updated successfully.")
     return True
-
 
 InitDataBase()

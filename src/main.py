@@ -55,11 +55,7 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
-if __name__ == "__main__":
-    InitDataBase()
 
-    app.run(debug=True)
-    
 
 #Erics shit
 @app.route('/AgentSend', methods=['POST'])
@@ -93,8 +89,9 @@ def AgentSend():
     return jsonify({"status": "success", "software_added": len(installed_software)})
 
 
-@app.route('/GetUser', methods=['GET'])
+@app.route('/GetUser', methods=['GET', 'POST'])
 def GetUserInfo():
+    print("ROUTE HIT --------------------")
     username = request.args.get("username")
     password = request.args.get("password")
     data = request.get_json()
@@ -116,11 +113,14 @@ def GetSoftware():
     return jsonify(sftwbu)
     
 @app.route('/AddSoftware', methods=['GET'])
-def GetUserInfo():
+def AddSoftware():
     data = request.get_json()
     username = data.get('UserName')
     name = data.get('Name')
     version = data.get('Version')
     AddSoftware(username,name,version)
 
-
+if __name__ == "__main__":
+    InitDataBase()
+    app.run(debug=True)
+    
