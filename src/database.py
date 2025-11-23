@@ -147,7 +147,3 @@ def UpdateSoftwareByID(SoftwareID, Name=None, CVSS=None, Summary=None, Recommend
 
 
 InitDataBase()
-user = GetUser("test")
-print(user.Name)
-
-
