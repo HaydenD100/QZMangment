@@ -25,6 +25,7 @@ def InitDataBase():
     cur.execute("""
     CREATE TABLE IF NOT EXISTS "Software" (
         ID SERIAL PRIMARY KEY,
+        Version INT,
         Name VARCHAR(150) NOT NULL,
         CVSS NUMERIC(4,2),
         Summary TEXT,
@@ -57,7 +58,7 @@ def GetUser(name):
         userClass = None
     return userClass
 
-def AddSoftware(UserName, SoftwareName, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
+def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
     global conn, cur
     cur.execute('SELECT ID FROM "User" WHERE Name = %s;', (UserName,))
     row = cur.fetchone()
@@ -66,10 +67,10 @@ def AddSoftware(UserName, SoftwareName, CVSS=None, Summary=None, Recommendation=
         return None
     user_id = row[0]
     cur.execute("""
-        INSERT INTO "Software" (Name, CVSS, Summary, Recommendation, LastScan, UserID)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO "Software" (Name,Version, CVSS, Summary, Recommendation, LastScan, UserID)
+        VALUES (%s,%s, %s, %s, %s, %s, %s)
         RETURNING ID;
-    """, (SoftwareName, CVSS, Summary, Recommendation, LastScan, user_id))
+    """, (SoftwareName,Version, CVSS, Summary, Recommendation, LastScan, user_id))
     software_id = cur.fetchone()[0]
     conn.commit()
     print(f"Inserted Software '{SoftwareName}' with ID {software_id} for User '{UserName}'")
@@ -86,7 +87,7 @@ def GetSoftwareByUser(UserName):
     user_id = row[0]
 
     cur.execute("""
-        SELECT ID, Name, CVSS, Summary, Recommendation, LastScan, UserID
+        SELECT ID, Name,Version, CVSS, Summary, Recommendation, LastScan, UserID
         FROM "Software"
         WHERE UserID = %s;
     """, (user_id,))
@@ -97,16 +98,17 @@ def GetSoftwareByUser(UserName):
         sw = Software()
         sw.ID = r[0]
         sw.Name = r[1]
-        sw.CVSS = r[2]
-        sw.Summary = r[3]
-        sw.Recommendation = r[4]
-        sw.LastScan = r[5]
-        sw.UserID = r[6]
+        sw.Version = r[2]
+        sw.CVSS = r[3]
+        sw.Summary = r[4]
+        sw.Recommendation = r[5]
+        sw.LastScan = r[6]
+        sw.UserID = r[7]
         software_list.append(sw)
 
     return software_list
 
-def UpdateSoftwareByID(SoftwareID, Name=None, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
+def UpdateSoftwareByID(SoftwareID, Name=None, Version=None, CVSS=None, Summary=None, Recommendation=None, LastScan=None):
     global conn, cur
     fields = []
     values = []
@@ -114,6 +116,9 @@ def UpdateSoftwareByID(SoftwareID, Name=None, CVSS=None, Summary=None, Recommend
     if Name is not None:
         fields.append("Name = %s")
         values.append(Name)
+    if Version is not None:
+        fields.append("Version = %s")
+        values.append(Version)
     if CVSS is not None:
         fields.append("CVSS = %s")
         values.append(CVSS)

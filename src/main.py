@@ -2,7 +2,7 @@ from common import *
 from database import *
 import requests
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, make_response, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -60,3 +60,21 @@ if __name__ == "__main__":
 
     app.run(debug=True)
     
+
+
+@app.route('/AgentSend')
+def AgentSend():
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    data = request.get_json()
+
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    un = GetUser(username)
+    if un.HashedPassword != password:
+        return jsonify({"error": "Incorrect username or password"}), 400
+    for software in data.get('Softwares'):
+        AddSoftware(username,software['Name'],software['Version'])
+

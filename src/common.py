@@ -2,6 +2,7 @@ class Software:
     def __init__(self):
         self.ID = None
         self.Name = None
+        self.Version = None
         self.CVSS = None
         self.Summary = None
         self.Recommnedation = None
