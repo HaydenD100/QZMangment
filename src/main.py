@@ -3,8 +3,10 @@ from database import *
 import requests
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, make_response, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = "y098765rtyfghjUIASDTYGHJAUISO*IUIY^&%RTFAGD"
 @app.route('/')
 def default_route():
@@ -74,18 +76,29 @@ def AgentSend():
         AddSoftware(username,software['Name'],software['Version'])
 
 @app.route('/GetUser', methods=['GET', 'POST'])
-def GetUserInfo():
-    print("ROUTE HIT --------------------")
-    username = request.args.get("username")
-    password = request.args.get("password")
-    data = request.get_json()
-    un = GetUser(username)
+def get_user_info():
+    if request.method == "GET":
+        username = request.args.get("username")
+        password = request.args.get("password")
+    else:  # POST
+        data = request.get_json() or {}
+        username = data.get("username")
+        password = data.get("password")
+
+    # Validate input
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
-    elif un.HashedPassword != password:
+
+    # Get user from database
+    un = GetUser(username)
+    if not un:
+        return jsonify({"error": "User not found"}), 404
+
+    # Check password
+    if un.HashedPassword != password:
         return jsonify({"error": "Incorrect username or password"}), 400
-    else:
-        return  jsonify(GetUser(username))
+    # Return user info
+    return  serialize_user(GetUser(username))
     
 #getting software belonging to user GetSoftwareByUser()
 @app.route('/GetAllSoftware', methods=['GET'])

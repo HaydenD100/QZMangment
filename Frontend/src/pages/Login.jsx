@@ -16,31 +16,35 @@ export default function Login() {
     setError("");
 
     try {
-      // Build query params for GET request
-      const params = new URLSearchParams({
-        username: email,   // your Flask endpoint expects 'username'
-        password: password
-      });
+  setIsLoading(true);
 
-      const response = await fetch(`http://127.0.0.1:5000/GetUser?${params.toString()}`, {
-        method: "GET",
-      });
+  const response = await fetch("http://127.0.0.1:5000/GetUser", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      username: email,
+      password: password
+    })
+  });
 
-      const data = await response.json();
+  const data = await response.json(); // parse JSON once
 
-      if (!response.ok) {
-        // Handle errors returned by Flask
-        setError(data.error || "Login failed");
-      } else {
-        console.log("Login successful:", data);
-        // Navigate to dashboard or home page
-        navigate("/dashboard");
-      }
-    } catch (err) {
-      setError("Network error");
-    } finally {
-      setIsLoading(false);
-    }
+  if (!response.ok) {
+    setError(data.error || "Login failed");
+  } else {
+    console.log("Login successful:", data);
+    localStorage.setItem("role", "admin");
+    localStorage.setItem("username", "Admin User");
+    navigate("/admin"); // now it will navigate
+  }
+} catch (err) {
+  console.error("Network error:", err);
+  setError("Network error");
+} finally {
+  setIsLoading(false);
+}
   };
 
   return (

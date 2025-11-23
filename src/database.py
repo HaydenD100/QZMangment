@@ -156,4 +156,12 @@ def UpdateSoftwareByID(SoftwareID, Name=None, Version=None, CVSS=None, Summary=N
     print(f"Software with ID {SoftwareID} updated successfully.")
     return True
 
+def serialize_user(user):
+    if not user:
+        return None
+    return {
+        "ID": user.ID,
+        "Name": user.Name,
+        "HashedPassword": user.HashedPassword
+    }
 InitDataBase()
