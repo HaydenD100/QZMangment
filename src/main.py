@@ -1,4 +1,5 @@
-from common import User
+from common import *
+from database import *
 import requests
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, make_response
@@ -6,9 +7,6 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 app.secret_key = "y098765rtyfghjUIASDTYGHJAUISO*IUIY^&%RTFAGD"
-user_list = [User(123, "admin", "pass")]
-credentials = {user.Name: user.HashedPassword for user in user_list}
-
 @app.route('/')
 def default_route():
     if "username" in session:
@@ -23,8 +21,10 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        # validate plain-text credentials
-        if username in credentials and credentials[username] == password:
+        un = GetUser(username)
+        if un == None:
+            return render_template("login.html", error="Invalid username or password")
+        elif un.HashedPassword == password:
             return redirect(url_for('dashboard', user=username, pwd=password))
 
         return render_template("login.html", error="Invalid username or password")
@@ -42,11 +42,11 @@ def dashboard():
         return redirect(url_for('login'))
 
     # User invalid → deny
-    if username not in credentials:
+    if GetUser(username) == None:
         return redirect(url_for('login'))
 
     # Password mismatch → deny
-    if credentials[username] != pwd:
+    if GetUser(username).HashedPassword != pwd:
         return redirect(url_for('login'))
 
     # All checks passed
@@ -58,4 +58,7 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == "__main__":
+    InitDataBase()
+
     app.run(debug=True)
+    
