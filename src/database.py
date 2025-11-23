@@ -87,7 +87,7 @@ def GetSoftwareByUser(UserName):
     user_id = row[0]
 
     cur.execute("""
-        SELECT ID, Name,Version, CVSS, Summary, Recommendation, LastScan, UserID
+        SELECT *
         FROM "Software"
         WHERE UserID = %s;
     """, (user_id,))

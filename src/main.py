@@ -61,7 +61,7 @@ if __name__ == "__main__":
     app.run(debug=True)
     
 
-
+#Erics shit
 @app.route('/AgentSend')
 def AgentSend():
     if not request.is_json:
@@ -78,3 +78,11 @@ def AgentSend():
     for software in data.get('Softwares'):
         AddSoftware(username,software['Name'],software['Version'])
 
+
+@app.route('/GetUser', methods=['GET'])
+def GetUserInfo():
+    data = request.get_json()
+    un = GetUser( data.get('username'))
+    return  jsonify(un)
+
+#getting software belonging to user GetSoftwareByUser()
