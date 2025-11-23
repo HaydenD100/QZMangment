@@ -3,7 +3,6 @@ from database import *
 import requests
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, make_response, jsonify
-from flask_cors import CORS
 
 app = Flask(__name__)
 app.secret_key = "y098765rtyfghjUIASDTYGHJAUISO*IUIY^&%RTFAGD"
@@ -57,37 +56,22 @@ def logout():
 
 
 
-#Erics shit
-@app.route('/AgentSend', methods=['POST'])
+#Erics shit 
+@app.route('/AgentSend')
 def AgentSend():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
-
     data = request.get_json()
 
-    # Extract auth info
-    auth = data.get('auth', {})
-    username = auth.get('username')
-    password = auth.get('password')
+    username = data.get('username')
+    password = data.get('password')
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
-
-    # Validate user
     un = GetUser(username)
     if un.HashedPassword != password:
         return jsonify({"error": "Incorrect username or password"}), 400
-
-    # Extract and add installed software
-    installed_software = data.get('installed_software', [])
-    for software in installed_software:
-        # Use correct keys as in JSON
-        name = software.get('name')
-        version = software.get('version')
-        if name and version:
-            AddSoftware(username, name, version)
-
-    return jsonify({"status": "success", "software_added": len(installed_software)})
-
+    for software in data.get('Softwares'):
+        AddSoftware(username,software['Name'],software['Version'])
 
 @app.route('/GetUser', methods=['GET', 'POST'])
 def GetUserInfo():
