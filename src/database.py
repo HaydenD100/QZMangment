@@ -140,7 +140,7 @@ def GetSoftwareByUser(UserName):
 
     return software_list
 
-def GetSoftwareByUser(UserName, SoftwareName):
+def GetSoftwareByUserAndName(UserName, SoftwareName):
     global cur
     cur.execute('SELECT ID FROM "UserMonitor" WHERE Name = %s;', (UserName,))
     row = cur.fetchone()
