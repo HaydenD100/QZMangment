@@ -9,8 +9,8 @@ class Software:
         self.UserID
         pass
 class User:
-    def __init__(self):
-        self.ID
-        self.HashedPassword
-        self.Name
+    def __init__(self, user_id, name, hashed_password):
+        self.ID = user_id
+        self.Name = name
+        self.HashedPassword = hashed_password
         pass
