@@ -3,7 +3,6 @@ import nvdlib
 from datetime import datetime
 
 # Import functions directly from your database.py
-# We don't need SQL queries here anymore!
 from database import GetAllSoftware, UpdateSoftwareByID
 
 # --- CONFIGURATION ---
@@ -17,7 +16,6 @@ def EnrichData():
     all_software = GetAllSoftware()
     
     # 2. Filter in Python: Only keep items where CVSS is None
-    # We use the object attribute .CVSS (defined in your GetAllSoftware function)
     unscanned_software = [sw for sw in all_software if sw.CVSS is None]
     
     total_items = len(unscanned_software)
@@ -31,7 +29,6 @@ def EnrichData():
 
     # 3. Iterate through the objects
     for i, sw in enumerate(unscanned_software):
-        # Access attributes directly from the class object
         sw_id = sw.ID
         sw_name = sw.Name
         sw_version = sw.Version
@@ -40,11 +37,11 @@ def EnrichData():
         print(f"[{i+1}/{total_items}] Searching NVD for: {search_query}...")
 
         try:
+            # --- FIXED SEARCH CALL ---
             results = nvdlib.searchCVE(
                 keywordSearch=search_query,
                 key=NIST_API_KEY,
-                limit=1,
-                sortKeywordSearch=True 
+                limit=1
             )
             
             current_time = datetime.now()
@@ -61,7 +58,6 @@ def EnrichData():
                 desc = cve.descriptions[0].value if cve.descriptions else "No description"
                 rec_link = f"https://nvd.nist.gov/vuln/detail/{cve.id}"
 
-                # Update using your existing function
                 UpdateSoftwareByID(
                     SoftwareID=sw_id, 
                     CVSS=score, 
@@ -72,7 +68,6 @@ def EnrichData():
                 print(f"    -> Found CVE! Score: {score}")
             
             else:
-                # Mark as 0.0 to prevent re-scanning next time
                 UpdateSoftwareByID(
                     SoftwareID=sw_id, 
                     CVSS=0.0, 
