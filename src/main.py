@@ -85,4 +85,13 @@ def GetUserInfo():
     un = GetUser( data.get('username'))
     return  jsonify(un)
 
+
+@app.route('/AddSoftware', methods=['GET'])
+def GetUserInfo():
+    data = request.get_json()
+    username = data.get('UserName')
+    name = data.get('Name')
+    version = data.get('Version')
+    AddSoftware(username,name,version)
 #getting software belonging to user GetSoftwareByUser()
+#dashboard() should return the user in json format if password is correct if not return fail

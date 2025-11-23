@@ -76,6 +76,12 @@ def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recomm
     print(f"Inserted Software '{SoftwareName}' with ID {software_id} for User '{UserName}'")
     return software_id
 
+def GetAllSoftware():
+    cur.execute('SELECT * FROM "Software";')
+    software = cur.fetchone()
+    return software
+
+
 def GetSoftwareByUser(UserName):
     global cur
     cur.execute('SELECT ID FROM "User" WHERE Name = %s;', (UserName,))
