@@ -95,11 +95,26 @@ def AgentSend():
 
 @app.route('/GetUser', methods=['GET'])
 def GetUserInfo():
+    username = request.args.get("username")
+    password = request.args.get("password")
     data = request.get_json()
-    un = GetUser( data.get('username'))
-    return  jsonify(un)
-
-
+    un = GetUser(username)
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    elif un.HashedPassword != password:
+        return jsonify({"error": "Incorrect username or password"}), 400
+    else:
+        return  jsonify(GetUser(username))
+    
+#getting software belonging to user GetSoftwareByUser()
+@app.route('/GetAllSoftware', methods=['GET'])
+def GetSoftware():
+    username = request.args.get("username")
+    password = request.args.get("password")
+    data = request.get_json()
+    sftwbu = GetSoftwareByUser(username)
+    return jsonify(sftwbu)
+    
 @app.route('/AddSoftware', methods=['GET'])
 def GetUserInfo():
     data = request.get_json()
@@ -107,5 +122,5 @@ def GetUserInfo():
     name = data.get('Name')
     version = data.get('Version')
     AddSoftware(username,name,version)
-#getting software belonging to user GetSoftwareByUser()
-#dashboard() should return the user in json format if password is correct if not return fail
+
+
