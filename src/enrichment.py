@@ -1,5 +1,4 @@
 import time
-import re
 import nvdlib
 from datetime import datetime
 from database import GetAllSoftware, UpdateSoftwareByID
@@ -8,113 +7,105 @@ from database import GetAllSoftware, UpdateSoftwareByID
 NIST_API_KEY = '3e3e6770-7a4f-44d3-b1a4-5bc6c5fb8cab'
 DELAY_SECONDS = 0.6 
 
-def CleanName(raw_name):
-    """
-    Transforms 'SpotifyAB.SpotifyMusic' -> 'Spotify Music'
-    Transforms 'Microsoft.WindowsCalculator_8weky...' -> 'Windows Calculator'
-    """
-    # 1. Remove version numbers or hashes (often after an underscore or at end)
-    name = raw_name.split('_')[0] # Remove _8weky...
-    
-    # 2. Split by dot (common in Package Names)
-    if '.' in name:
-        parts = name.split('.')
-        # Usually the last part is the product name (e.g. SpotifyMusic)
-        name = parts[-1]
-
-    # 3. Split CamelCase (SpotifyMusic -> Spotify Music)
-    name = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
-
-    return name.strip()
-
 def EnrichData():
-    print("[*] Fetching software list...")
+    print("[*] Fetching software list from database...")
+    
+    # 1. Get ALL software objects
     all_software = GetAllSoftware()
     
-    # Filter: Only scan items where CVSS is None
+    # 2. Filter: Only scan items where CVSS is None (New items)
     unscanned_software = [sw for sw in all_software if sw.CVSS is None]
-    total = len(unscanned_software)
     
-    if total == 0:
-        print("[*] No new software to scan.")
+    total_items = len(unscanned_software)
+    
+    if total_items == 0:
+        print("[*] System is up to date! No new software to scan.")
         return
 
-    print(f"[*] Found {total} items. Starting analysis...")
+    print(f"[*] Found {total_items} items to enrich using Clean Names.")
+    print(f"[*] Estimated time: {(total_items * DELAY_SECONDS) / 60:.1f} minutes.")
 
+    # 3. Iterate through the objects
     for i, sw in enumerate(unscanned_software):
         sw_id = sw.ID
-        original_name = sw.Name
-        version = sw.Version
-        
-        # --- STRATEGY: TRY ORIGINAL NAME, THEN TRY CLEAN NAME ---
-        search_candidates = [original_name]
-        
-        clean_name = CleanName(original_name)
-        if clean_name != original_name:
-            search_candidates.append(clean_name)
+        # These are now the CLEAN names from your DB (e.g. "Spotify")
+        sw_name = sw.Name 
+        sw_version = sw.Version
 
-        results = []
-        used_name = ""
+        search_query = f"{sw_name} {sw_version}"
+        print(f"[{i+1}/{total_items}] Searching NVD for: {search_query}...")
 
-        for search_name in search_candidates:
-            query = f"{search_name} {version}"
-            print(f"[{i+1}/{total}] Attempting search: '{query}'...")
+        try:
+            # Fetch the top 10 most relevant CVEs
+            results = nvdlib.searchCVE(
+                keywordSearch=search_query,
+                key=NIST_API_KEY,
+                limit=10 
+            )
             
-            try:
-                # Remove limit=1 to get ALL CVEs
-                results = nvdlib.searchCVE(
-                    keywordSearch=query,
-                    key=NIST_API_KEY,
-                    limit=10 # Get top 10 relevant CVEs
+            current_time = datetime.now()
+
+            if results:
+                print(f"    -> Found {len(results)} potential vulnerabilities.")
+                
+                max_cvss = 0.0
+                report_lines = []
+                
+                # Loop through results to Aggregate Data
+                for cve in results:
+                    # 1. Get Score (V3.1 > V3.0 > V2.0)
+                    score = 0.0
+                    if hasattr(cve, 'v31score'): score = cve.v31score
+                    elif hasattr(cve, 'v30score'): score = cve.v30score
+                    elif hasattr(cve, 'v2score'): score = cve.v2score
+                    
+                    # 2. Track the Highest Risk
+                    if score > max_cvss:
+                        max_cvss = score
+                    
+                    # 3. Format the Description for the report
+                    cve_id = cve.id
+                    desc = cve.descriptions[0].value if cve.descriptions else "No description"
+                    # Truncate long descriptions to keep the report readable
+                    short_desc = (desc[:120] + '...') if len(desc) > 120 else desc
+                    
+                    report_lines.append(f"[{cve_id} | Score: {score}] {short_desc}")
+
+                # 4. Create the Summary Report (Top 5 only)
+                final_summary = "\n\n".join(report_lines[:5])
+                
+                # Add a footer if there are more
+                if len(results) > 5:
+                    final_summary += f"\n\n...and {len(results) - 5} more vulnerabilities found."
+
+                # 5. Create a dynamic link for the user to see full details
+                rec_link = f"https://nvd.nist.gov/vuln/search?query={sw_name} {sw_version}"
+
+                # 6. Update Database
+                UpdateSoftwareByID(
+                    SoftwareID=sw_id, 
+                    CVSS=max_cvss, 
+                    Summary=final_summary, 
+                    Recommendation=rec_link, 
+                    LastScan=current_time
                 )
-                if results:
-                    used_name = search_name
-                    break # Found something! Stop trying other names.
-                
-                time.sleep(DELAY_SECONDS) # Sleep between attempts
-                
-            except Exception as e:
-                print(f"[!] API Error: {e}")
-                time.sleep(DELAY_SECONDS)
-
-        # --- PROCESS RESULTS ---
-        current_time = datetime.now()
-
-        if results:
-            print(f"    -> Found {len(results)} CVEs using name '{used_name}'")
+                print(f"    -> Saved. Max Risk: {max_cvss}")
             
-            max_cvss = 0.0
-            summary_report = []
-            
-            # Loop through found CVEs to build a report
-            for cve in results:
-                # Get Score
-                score = 0.0
-                if hasattr(cve, 'v31score'): score = cve.v31score
-                elif hasattr(cve, 'v30score'): score = cve.v30score
-                elif hasattr(cve, 'v2score'): score = cve.v2score
-                
-                # Update Max Score
-                if score > max_cvss: max_cvss = score
-                
-                # Add to text report
-                desc = cve.descriptions[0].value if cve.descriptions else "No desc"
-                # Limit desc length to keep DB clean
-                short_desc = (desc[:100] + '..') if len(desc) > 100 else desc
-                summary_report.append(f"[{cve.id} | Score: {score}] {short_desc}")
+            else:
+                # No vulnerabilities found
+                UpdateSoftwareByID(
+                    SoftwareID=sw_id, 
+                    CVSS=0.0, 
+                    Summary="No known vulnerabilities found in NVD for this specific version.", 
+                    Recommendation="Keep software updated.", 
+                    LastScan=current_time
+                )
+                print("    -> Clean. No CVEs found.")
 
-            # Create the final blob for the Summary field
-            final_summary = "\n".join(summary_report[:5]) # Top 5 only
-            if len(results) > 5: final_summary += f"\n...and {len(results)-5} more."
-            
-            rec_link = f"https://nvd.nist.gov/vuln/search?query={used_name} {version}"
+        except Exception as e:
+            print(f"[!] API Error for {sw_name}: {e}")
 
-            UpdateSoftwareByID(sw_id, max_cvss, final_summary, rec_link, current_time)
-
-        else:
-            print(f"    -> Clean. No vulnerabilities found.")
-            UpdateSoftwareByID(sw_id, 0.0, "No CVEs found for this version.", "N/A", current_time)
-
+        # Respect Rate Limits
         time.sleep(DELAY_SECONDS)
 
 if __name__ == "__main__":
