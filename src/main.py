@@ -62,21 +62,35 @@ if __name__ == "__main__":
     
 
 #Erics shit
-@app.route('/AgentSend')
+@app.route('/AgentSend', methods=['POST'])
 def AgentSend():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
+
     data = request.get_json()
 
-    username = data.get('username')
-    password = data.get('password')
+    # Extract auth info
+    auth = data.get('auth', {})
+    username = auth.get('username')
+    password = auth.get('password')
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
+
+    # Validate user
     un = GetUser(username)
     if un.HashedPassword != password:
         return jsonify({"error": "Incorrect username or password"}), 400
-    for software in data.get('Softwares'):
-        AddSoftware(username,software['Name'],software['Version'])
+
+    # Extract and add installed software
+    installed_software = data.get('installed_software', [])
+    for software in installed_software:
+        # Use correct keys as in JSON
+        name = software.get('name')
+        version = software.get('version')
+        if name and version:
+            AddSoftware(username, name, version)
+
+    return jsonify({"status": "success", "software_added": len(installed_software)})
 
 
 @app.route('/GetUser', methods=['GET'])
