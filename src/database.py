@@ -1,49 +1,74 @@
 import psycopg
+import json
+import time
+import google.generativeai as genai
 from common import *
+
+# --- CONFIGURATION ---
+GEMINI_API_KEY = 'YOUR_GEMINI_KEY_HERE' # <--- PASTE YOUR KEY HERE
+BATCH_SIZE = 40
+
+# Configure Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+# We use the specific -001 version to avoid the 404 error
+model = genai.GenerativeModel('gemini-1.5-flash-001')
 
 conn = None
 cur = None
 
 def InitDataBase():
     global conn, cur
-    conn = psycopg.connect(
-        dbname="Monitor",
-        user="postgres",
-        password="admin123",
-        host="localhost",
-        port="5432"
-    )
-    cur = conn.cursor()
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS "UserMonitor" (
-        ID SERIAL PRIMARY KEY,
-        Name VARCHAR(150) NOT NULL UNIQUE,
-        HashedPassword VARCHAR(255) NOT NULL,
-        OS VARCHAR(255),
-        Build VARCHAR(255)
-    );
-    """)
+    try:
+        conn = psycopg.connect(
+            dbname="Monitor",
+            user="postgres",
+            password="admin123",
+            host="localhost",
+            port="5432",
+            connect_timeout=5 # <--- ADDED: Fails after 5s instead of hanging forever
+        )
+        cur = conn.cursor()
+        print("[+] Database Connected.")
+    except Exception as e:
+        print(f"[!] Database Connection Failed: {e}")
+        # We don't exit here so that imports don't crash the whole app, 
+        # but the app won't work without DB.
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS "Software" (
-    ID SERIAL PRIMARY KEY,
-    Version VARCHAR(255),
-    Name VARCHAR(150) NOT NULL,
-    CVSS NUMERIC(4,2),
-    Summary TEXT,
-    Recommendation TEXT,
-    LastScan TIMESTAMP,
-    UserID INT,
-    FOREIGN KEY (UserID) REFERENCES "UserMonitor"(ID) ON DELETE SET NULL,
-    CONSTRAINT unique_user_software UNIQUE (Name, UserID)
-    );
-    """)
+    # --- TABLE CREATION ---
+    if cur:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS "UserMonitor" (
+            ID SERIAL PRIMARY KEY,
+            Name VARCHAR(150) NOT NULL UNIQUE,
+            HashedPassword VARCHAR(255) NOT NULL,
+            OS VARCHAR(255),
+            Build VARCHAR(255)
+        );
+        """)
 
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test", "test1"))
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test@qz.com", "test1"))
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("admin@qz.com", "admin123"))
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS "Software" (
+            ID SERIAL PRIMARY KEY,
+            Version VARCHAR(255),
+            Name VARCHAR(150) NOT NULL,
+            CVSS NUMERIC(4,2),
+            Summary TEXT,
+            Recommendation TEXT,
+            LastScan TIMESTAMP,
+            UserID INT,
+            FOREIGN KEY (UserID) REFERENCES "UserMonitor"(ID) ON DELETE SET NULL,
+            CONSTRAINT unique_user_software UNIQUE (Name, UserID)
+        );
+        """)
+        
+        # Default Users
+        cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test", "test1"))
+        cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test@qz.com", "test1"))
+        cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("admin@qz.com", "admin123"))
 
-    conn.commit()
+        conn.commit()
+
+# --- CRUD FUNCTIONS ---
 
 def AddUser(name, hashedpassword):
     global conn, cur
@@ -84,10 +109,16 @@ def AddSoftware(UserName, SoftwareName, Version, CVSS=None, Summary=None, Recomm
         VALUES (%s,%s, %s, %s, %s, %s, %s) ON CONFLICT (Name, UserID) DO NOTHING
     RETURNING ID;
     """, (SoftwareName,Version, CVSS, Summary, Recommendation, LastScan, user_id))
-    software_id = cur.fetchone()[0]
-    conn.commit()
-    print(f"Inserted Software '{SoftwareName}' with ID {software_id} for UserMonitor '{UserName}'")
-    return software_id
+    
+    # Check if insert actually happened (it might return None on conflict)
+    res = cur.fetchone()
+    if res:
+        software_id = res[0]
+        conn.commit()
+        print(f"Inserted Software '{SoftwareName}' with ID {software_id} for UserMonitor '{UserName}'")
+        return software_id
+    else:
+        return None
 
 def GetAllSoftware():
     cur.execute('SELECT * FROM "Software";')
@@ -95,10 +126,10 @@ def GetAllSoftware():
     software_list = []
     for r in rows:
         sw = Software()
-        print(r)
+        # Note: Keeping your existing column mapping logic
         sw.ID = r[0]
-        sw.Name = r[2]       # Should be 'version' here
-        sw.Version = r[1]    # Should be 'name' here
+        sw.Name = r[2]       # Assuming Name is column 2
+        sw.Version = r[1]    # Assuming Version is column 1
         sw.CVSS = r[3]
         sw.Summary = r[4]
         sw.Recommendation = r[5]
@@ -129,8 +160,8 @@ def GetSoftwareByUser(UserName):
     for r in rows:
         sw = Software()
         sw.ID = r[0]
-        sw.Name = r[1]       # Should be 'version' here
-        sw.Version = r[2]    # Should be 'name' here
+        sw.Name = r[1]       
+        sw.Version = r[2]    
         sw.CVSS = r[3]
         sw.Summary = r[4]
         sw.Recommendation = r[5]
@@ -156,12 +187,14 @@ def GetSoftwareByUserAndName(UserName, SoftwareName):
         WHERE UserID = %s AND Name = %s;
     """, (user_id,SoftwareName))
 
-    r = cur.fetchall()
-    r = r[0]
+    rows = cur.fetchall()
+    if not rows: return None
+    
+    r = rows[0]
     sw = Software()
     sw.ID = r[0]
-    sw.Name = r[1]       # Should be 'version' here
-    sw.Version = r[2]    # Should be 'name' here
+    sw.Name = r[1]       
+    sw.Version = r[2]    
     sw.CVSS = r[3]
     sw.Summary = r[4]
     sw.Recommendation = r[5]
@@ -212,25 +245,82 @@ def UpdateSoftwareByID(SoftwareID, Name=None, Version=None, CVSS=None, Summary=N
     print(f"Software with ID {SoftwareID} updated successfully.")
     return True
 
+# --- AI CLEANING FUNCTIONS (NEW) ---
+
+def CleanSoftwareNames():
+    """
+    Batches software names, sends them to Gemini for cleaning, and updates DB.
+    Call this function manually when you want to clean your data.
+    """
+    print("[*] Starting AI Name Cleaning...")
+    
+    # Get all software
+    cur.execute('SELECT ID, Name FROM "Software"')
+    all_software = cur.fetchall()
+    
+    total = len(all_software)
+    if total == 0:
+        print("[*] No software found to clean.")
+        return
+
+    # Process in chunks
+    for i in range(0, total, BATCH_SIZE):
+        batch = all_software[i:i + BATCH_SIZE]
+        messy_names = [item[1] for item in batch]
+        
+        print(f"[*] Cleaning batch {i}/{total}...")
+        
+        prompt = f"""
+        I have a list of raw software package names from Windows. 
+        I need you to convert them into the standard "Product Name" used in the NVD (National Vulnerability Database).
+        Rules:
+        1. Remove "Microsoft.", "Corporation", "Inc", ".app" extensions.
+        2. Convert "Microsoft.WindowsCalculator" -> "Windows Calculator".
+        3. Convert "SpotifyAB.SpotifyMusic" -> "Spotify".
+        4. If it is a generic driver or obscure ID, return "Windows Component".
+        
+        Input List: {json.dumps(messy_names)}
+        
+        Return ONLY a JSON Object mapping Input -> Clean Name. Format: {{"Messy": "Clean"}}
+        """
+
+        try:
+            response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+            cleaning_map = json.loads(response.text)
+            
+            for sw_id, old_name in batch:
+                if old_name in cleaning_map:
+                    new_name = cleaning_map[old_name]
+                    # Only update if the name actually changed
+                    if new_name != old_name:
+                        # Update using direct SQL
+                        cur.execute('UPDATE "Software" SET Name = %s WHERE ID = %s', (new_name, sw_id))
+                        print(f"    [FIX] {old_name} -> {new_name}")
+            
+            conn.commit() # Commit after every batch
+            time.sleep(1) # Be nice to the API
+
+        except Exception as e:
+            print(f"[!] Batch Error: {e}")
+            conn.rollback()
+
+    print("[*] Cleaning Complete.")
+
 def serialize_user(user):
-    if not user:
-        return None
-    return {
-        "ID": user.ID,
-        "Name": user.Name,
-        "HashedPassword": user.HashedPassword
-    }
+    if not user: return None
+    return { "ID": user.ID, "Name": user.Name, "HashedPassword": user.HashedPassword }
 
 def serialize_software(s):
     return {
-        "ID": s.ID,
-        "Name": s.Name,
-        "CVSS": s.CVSS,
-        "Summary": s.Summary,
-        "Recommendation": s.Recommendation,
-        "LastScan": s.LastScan,
-        "UserID": s.UserID,
-        "Version": s.Version
+        "ID": s.ID, "Name": s.Name, "CVSS": s.CVSS,
+        "Summary": s.Summary, "Recommendation": s.Recommendation,
+        "LastScan": s.LastScan, "UserID": s.UserID, "Version": s.Version
     }
 
+# Initialize connection on import
 InitDataBase()
+
+# --- HOW TO RUN CLEANING ---
+# To clean your data, uncomment the line below and run this file ONCE:
+# if __name__ == "__main__":
+#     CleanSoftwareNames()
