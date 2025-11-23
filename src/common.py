@@ -1,16 +1,16 @@
 class Software:
     def __init__(self):
-        self.ID
-        self.Name
-        self.CVSS
-        self.Summary
-        self.Recommnedation
-        self.LastScan #Time Stamp
-        self.UserID
+        self.ID = None
+        self.Name = None
+        self.CVSS = None
+        self.Summary = None
+        self.Recommnedation = None
+        self.LastScan = None #Time Stamp
+        self.UserID = None
         pass
 class User:
-    def __init__(self, user_id, name, hashed_password):
-        self.ID = user_id
-        self.Name = name
-        self.HashedPassword = hashed_password
+    def __init__(self):
+        self.ID = None
+        self.HashedPassword = None
+        self.Name = None
         pass
