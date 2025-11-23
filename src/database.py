@@ -18,7 +18,9 @@ def InitDataBase():
     CREATE TABLE IF NOT EXISTS "UserMonitor" (
         ID SERIAL PRIMARY KEY,
         Name VARCHAR(150) NOT NULL UNIQUE,
-        HashedPassword VARCHAR(255) NOT NULL
+        HashedPassword VARCHAR(255) NOT NULL,
+        OS VARCHAR(255),
+        Build VARCHAR(255)
     );
     """)
 
@@ -36,15 +38,23 @@ def InitDataBase():
     );
     """)
     
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", ("test", "test1"))
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", ("test@qz.com", "test1"))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;;", ("test", "test1"))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;;", ("test@qz.com", "test1"))
 
     conn.commit()
 
 def AddUser(name, hashedpassword):
     global conn, cur
-    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s);", (name, hashedpassword))
+    cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;;", (name, hashedpassword))
     conn.commit()
+
+def UpdateUser(name, OS = None, BuildVersion = None):
+    cur.execute("""
+    UPDATE "UserMonitor"
+    SET OS = %s,
+        Build = %s
+    WHERE Name = %s;
+    """, (OS, BuildVersion, name))
 
 def GetUser(name):
     global conn, cur
