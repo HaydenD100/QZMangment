@@ -42,7 +42,6 @@ def InitDataBase():
     cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test", "test1"))
     cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("test@qz.com", "test1"))
     cur.execute("INSERT INTO \"UserMonitor\" (Name, HashedPassword) VALUES (%s, %s) ON CONFLICT (Name) DO NOTHING;", ("admin@qz.com", "admin123"))
-    cur.execute('INSERT INTO "Software" (Version, Name, CVSS, Summary, Recommendation, LastScan, UserID) VALUES (%s, %s, %s, %s, %s, %s, %s)', (1, "Example Software", 7.5, "This is a summary of the software vulnerability.", "Update to the latest version.", "2025-11-23 10:00:00", 1))
 
     conn.commit()
 

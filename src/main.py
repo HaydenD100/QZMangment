@@ -135,7 +135,7 @@ def GetUserSoftware():
     return jsonify(json_list) 
 
 @app.route('/GetSoftwareByName', methods=['GET'])
-def GetSoftware():
+def GetSoftwareByName():
     data = request.get_json() or {}
     username = data.get("username")
     password = data.get("password")
